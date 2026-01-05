@@ -1,0 +1,7 @@
+# Dépendances pour l'application Presence Plus
+flet>=0.21.0
+pymongo[srv]>=4.6.0
+python-dotenv>=1.0.0
+geocoder>=1.38.1
+geopy>=2.4.0
+reportlab>=4.0.7
