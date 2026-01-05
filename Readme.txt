@@ -1,4 +1,4 @@
-Je veux creer le proge presence plus
+PRESENCE-PLUS
 
 Voic le plan : 
 Pour infomation l'application a 02 vole : Delegue(groupe de personne qui ont un peu de pouvoir pour coodiner les chose ) , Etudiant (Les utilisations normal )
