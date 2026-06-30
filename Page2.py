@@ -12,15 +12,6 @@ class page2:
         self.page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
         self.page.padding = 20
         self.page.scroll = ft.ScrollMode.AUTO
-        
-        # Connexion à MongoDB
-        if not db.connect():
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("Erreur de connexion à la base de données!"),
-                bgcolor=ft.Colors.RED
-            )
-            self.page.snack_bar.open = True
-        
         self.seance_active = None
         
     def Head(self):
@@ -115,14 +106,15 @@ class page2:
             animate=ft.Animation(300, ft.AnimationCurve.EASE_IN_OUT),
         )
         
-        if self.On_est_au_Cours():
+        seance_en_cours = self.On_est_au_Cours()
+
+        if seance_en_cours:
             create_session_btn.bgcolor = ft.Colors.GREY_400
             create_session_btn.on_click = None
             create_session_btn.ink = False
-        
+
         # Construire la liste des contrôles
         controls = [
-            # Logo en haut
             ft.Container(
                 content=ft.Image(
                     src="Logo.png",
@@ -143,8 +135,6 @@ class page2:
                 ),
                 margin=ft.margin.only(bottom=30),
             ),
-            
-            # Titre de bienvenue
             ft.Text(
                 "Bienvenue sur Presence Plus",
                 size=24,
@@ -152,13 +142,11 @@ class page2:
                 color=ft.Colors.BLUE_900,
             ),
             ft.Container(height=10),
-            
             create_session_btn,
             ft.Container(height=20),
         ]
         
-        # Afficher les informations de la séance en cours
-        if not self.On_est_au_Cours():
+        if not seance_en_cours:
             controls.append(ft.Text(
                 "Aucune séance en cours",
                 size=16,
@@ -166,18 +154,15 @@ class page2:
                 italic=True
             ))
         else:
-            # Séance active - afficher les informations
             from bson import ObjectId
             seance = db.obtenir_seance(str(self.seance_active["_id"]))
             matiere = db.obtenir_matiere(seance["matiere_code"])
             
-            # Calculer le temps restant
             from datetime import datetime, timedelta
             temps_ecoule = datetime.now() - seance["date_creation"]
             duree_totale = timedelta(minutes=seance["duree"])
             temps_restant = duree_totale - temps_ecoule
             
-            # Formatage du temps restant
             if temps_restant.total_seconds() > 0:
                 heures = int(temps_restant.total_seconds() // 3600)
                 minutes = int((temps_restant.total_seconds() % 3600) // 60)
@@ -277,13 +262,8 @@ class page2:
         """Affiche la liste des étudiants pour choisir qui promouvoir en délégué"""
         print("🔵 Sélection étudiant pour délégué")
         
-        # Récupérer tous les étudiants (non-délégués)
         etudiants = db.obtenir_tous_etudiants(titre="Etudiant")
-        
-        # Variable pour stocker la sélection
         etudiant_selectionne = {"matricule": None}
-        
-        # Créer la liste des étudiants avec RadioButtons
         etudiant_list = []
         radio_group = ft.RadioGroup(content=ft.Column())
         
@@ -329,7 +309,6 @@ class page2:
             self.page.update()
         
         def promouvoir_delegue(e):
-            # Récupérer le matricule sélectionné
             if not radio_group.value:
                 self.page.snack_bar = ft.SnackBar(
                     content=ft.Text("⚠️ Veuillez sélectionner un étudiant!"),
@@ -339,14 +318,12 @@ class page2:
                 self.page.update()
                 return
             
-            # Modifier l'étudiant pour le promouvoir en délégué
             result = db.modifier_etudiant(
                 matricule=radio_group.value,
                 updates={"titre": "Delegue"}
             )
             
             if result:
-                # Récupérer le nom de l'étudiant promu
                 etudiant = db.obtenir_etudiant(radio_group.value)
                 self.page.snack_bar = ft.SnackBar(
                     content=ft.Text(f"✅ {etudiant['nom']} est maintenant délégué!"),
@@ -425,10 +402,7 @@ class page2:
         """Affiche la liste des délégués"""
         print("🔵 Affichage liste délégués")
         
-        # Récupérer tous les délégués
         delegues = db.obtenir_tous_etudiants(titre="Delegue")
-        
-        # Créer la liste des délégués
         delegue_list = []
         for delegue in delegues:
             delegue_list.append(
@@ -440,25 +414,25 @@ class page2:
                                 delegue["nom"], 
                                 weight=ft.FontWeight.BOLD, 
                                 size=18,
-                                color=ft.Colors.BLUE_900  # Couleur foncée pour meilleure visibilité
+                                color=ft.Colors.BLUE_900
                             ),
                             ft.Text(
                                 f"Matricule: {delegue['matricule']} • Niveau: {delegue['level']}", 
                                 size=14, 
-                                color=ft.Colors.BLACK87  # Plus foncé
+                                color=ft.Colors.BLACK87
                             ),
                             ft.Text(
                                 delegue["email"], 
                                 size=13, 
                                 italic=True, 
-                                color=ft.Colors.BLACK54  # Plus lisible
+                                color=ft.Colors.BLACK54
                             ),
                         ], spacing=4, expand=True),
                     ]),
                     padding=15,
                     border=ft.border.all(2, ft.Colors.BLUE_300),
                     border_radius=12,
-                    bgcolor=ft.Colors.WHITE,  # Fond blanc pour meilleur contraste
+                    bgcolor=ft.Colors.WHITE,
                     margin=ft.margin.only(bottom=10),
                 )
             )
@@ -522,23 +496,18 @@ class page2:
         
         from utils import obtenir_position_automatique, obtenir_id_appareil
         
-        # Récupérer les matières disponibles
         print("🔵 Récupération des matières...")
         matieres = db.obtenir_toutes_matieres()
         print(f"🔵 {len(matieres)} matières trouvées")
         options_matieres = [ft.dropdown.Option(m["code"], f"{m['code']} - {m['titre']}") for m in matieres]
     
-        # Date automatique
-        print("🔵 Récupération de la date...")
         date_actuelle = datetime.now().strftime("%d/%m/%Y %H:%M")
         
-        # Localisation automatique
         print("🔵 Récupération de la localisation...")
         lat, lon = obtenir_position_automatique(self.page, methode="ip")
         localisation_auto = f"GPS: {lat:.6f}, {lon:.6f}" if lat and lon else "Position non disponible"
         print(f"🔵 Localisation: {localisation_auto}")
         
-        # Champs du formulaire
         date_field = ft.TextField(
             label="📅 Date et heure",
             value=date_actuelle,
@@ -572,9 +541,16 @@ class page2:
             value="120"
         )
         
+        # Récupérer le matricule du délégué connecté depuis page.data
+        delegue_matricule_auto = ""
+        if self.page.data and self.page.data.get("utilisateur"):
+            delegue_matricule_auto = self.page.data["utilisateur"].get("matricule", "")
+
         delegue_field = ft.TextField(
             label="👤 Matricule du délégué",
             hint_text="Ex: DEL001",
+            value=delegue_matricule_auto,
+            read_only=bool(delegue_matricule_auto),
             filled=True,
             border_color=ft.Colors.BLUE_200,
         )
@@ -584,7 +560,6 @@ class page2:
             self.page.update()
         
         def sauvegarder_seance(e):
-            # Validation
             if not matiere_dropdown.value or not duree_field.value or not delegue_field.value:
                 self.page.snack_bar = ft.SnackBar(
                     content=ft.Text("⚠️ Veuillez remplir tous les champs!"),
@@ -595,7 +570,6 @@ class page2:
                 return
             
             try:
-                # Créer la séance dans MongoDB
                 seance_id = db.creer_seance(
                     matiere_code=matiere_dropdown.value,
                     date=datetime.now(),
@@ -604,7 +578,6 @@ class page2:
                     delegue_matricule=delegue_field.value
                 )
                 
-                # Mettre à jour la position GPS de la séance
                 if seance_id and lat and lon:
                     db.mettre_a_jour_position_seance(seance_id, lat, lon)
                 
@@ -614,7 +587,6 @@ class page2:
                         bgcolor=ft.Colors.GREEN
                     )
                     dialog.open = False
-                    # Rafraîchir la page
                     self.page.clean()
                     self.build()
                 else:
@@ -635,7 +607,6 @@ class page2:
             modal=True,
             content=ft.Container(
                 content=ft.Column([
-                    # En-tête stylé
                     ft.Container(
                         content=ft.Row([
                             ft.Icon(ft.Icons.ADD_CIRCLE_OUTLINE, color=ft.Colors.BLUE, size=35),
@@ -648,8 +619,6 @@ class page2:
                         ], alignment=ft.MainAxisAlignment.CENTER),
                         padding=ft.padding.only(bottom=20)
                     ),
-                    
-                    # Formulaire
                     date_field,
                     ft.Container(height=10),
                     matiere_dropdown,
@@ -698,7 +667,6 @@ class page2:
         """Dialog pour exporter les présences en PDF"""
         print("🔵 Export PDF")
         
-        # Récupérer toutes les séances pour filtrer les matières et mois disponibles
         toutes_seances = db.obtenir_toutes_seances()
         
         if not toutes_seances:
@@ -710,10 +678,8 @@ class page2:
             self.page.update()
             return
         
-        # Extraire les codes de matières uniques qui ont des séances
         codes_matieres_avec_seances = list(set([s["matiere_code"] for s in toutes_seances]))
         
-        # Récupérer les matières correspondantes
         matieres_disponibles = []
         for code in codes_matieres_avec_seances:
             matiere = db.obtenir_matiere(code)
@@ -729,12 +695,11 @@ class page2:
             self.page.update()
             return
         
-        # Dropdown pour la matière
         matiere_dropdown = ft.Dropdown(
             label="Sélectionner la matière",
             hint_text="Choisissez une matière",
             options=[
-                ft.dropdown.Option(key=m["code"], text=f"{m['titre']} ({m['code']})")
+                ft.dropdown.Option(key=m["code"], text=f"{m['titre']} ({m['code']})") 
                 for m in matieres_disponibles
             ],
             border_color=ft.Colors.BLUE_400,
@@ -742,7 +707,6 @@ class page2:
             width=450,
         )
         
-        # Noms des mois
         mois_noms = {
             "01": "Janvier", "02": "Février", "03": "Mars",
             "04": "Avril", "05": "Mai", "06": "Juin",
@@ -750,7 +714,6 @@ class page2:
             "10": "Octobre", "11": "Novembre", "12": "Décembre"
         }
         
-        # Dropdown pour le mois (sera rempli dynamiquement)
         mois_dropdown = ft.Dropdown(
             label="Sélectionner le mois",
             hint_text="Sélectionnez d'abord une matière",
@@ -761,7 +724,6 @@ class page2:
             disabled=True,
         )
         
-        # Dropdown pour l'année (sera rempli dynamiquement)
         annee_dropdown = ft.Dropdown(
             label="Sélectionner l'année",
             hint_text="Sélectionnez d'abord un mois",
@@ -773,14 +735,11 @@ class page2:
         )
         
         def update_mois_disponibles(e):
-            """Met à jour la liste des mois disponibles selon la matière sélectionnée"""
             if not matiere_dropdown.value:
                 return
             
-            # Filtrer les séances de cette matière
             seances_matiere = [s for s in toutes_seances if s["matiere_code"] == matiere_dropdown.value]
             
-            # Extraire les mois uniques (année + mois)
             mois_annees = {}
             for seance in seances_matiere:
                 date = seance["date_creation"]
@@ -791,14 +750,12 @@ class page2:
                     mois_annees[annee] = set()
                 mois_annees[annee].add(mois)
             
-            # Construire la liste des mois disponibles
             mois_disponibles = set()
             for annee in mois_annees:
                 mois_disponibles.update(mois_annees[annee])
             
             mois_disponibles = sorted(list(mois_disponibles))
             
-            # Mettre à jour le dropdown des mois
             mois_dropdown.options = [
                 ft.dropdown.Option(key=mois, text=mois_noms[mois])
                 for mois in mois_disponibles
@@ -807,25 +764,20 @@ class page2:
             mois_dropdown.hint_text = "Choisissez un mois"
             mois_dropdown.value = None
             
-            # Réinitialiser l'année
             annee_dropdown.value = None
             annee_dropdown.options = []
             annee_dropdown.disabled = True
             annee_dropdown.hint_text = "Sélectionnez d'abord un mois"
             
-            # Stocker mois_annees pour l'utiliser dans update_annees
             matiere_dropdown.data = mois_annees
-            
             self.page.update()
         
         def update_annees_disponibles(e):
-            """Met à jour la liste des années disponibles selon le mois sélectionné"""
             if not mois_dropdown.value or not matiere_dropdown.value:
                 return
             
             mois_annees = matiere_dropdown.data
             
-            # Trouver les années qui ont ce mois
             annees_disponibles = []
             for annee, mois_set in mois_annees.items():
                 if mois_dropdown.value in mois_set:
@@ -833,7 +785,6 @@ class page2:
             
             annees_disponibles.sort()
             
-            # Mettre à jour le dropdown des années
             annee_dropdown.options = [
                 ft.dropdown.Option(key=annee, text=annee)
                 for annee in annees_disponibles
@@ -841,10 +792,8 @@ class page2:
             annee_dropdown.disabled = False
             annee_dropdown.hint_text = "Choisissez une année"
             annee_dropdown.value = annees_disponibles[0] if annees_disponibles else None
-            
             self.page.update()
         
-        # Connecter les événements
         matiere_dropdown.on_change = update_mois_disponibles
         mois_dropdown.on_change = update_annees_disponibles
         
@@ -862,7 +811,6 @@ class page2:
                 self.page.update()
                 return
             
-            # Générer le PDF
             from utils import generer_pdf_presences
             
             success, message = generer_pdf_presences(
@@ -874,9 +822,7 @@ class page2:
             dialog.open = False
             self.page.update()
             
-            # Afficher un dialog de confirmation
             if success:
-                # Dialog de succès avec le chemin du fichier
                 def fermer_succes(e):
                     dialog_succes.open = False
                     self.page.update()
@@ -947,7 +893,6 @@ class page2:
                 dialog_succes.open = True
                 self.page.update()
             else:
-                # Dialog d'erreur
                 def fermer_erreur(e):
                     dialog_erreur.open = False
                     self.page.update()

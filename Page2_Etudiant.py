@@ -12,15 +12,6 @@ class page2_etudiant:
         self.page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
         self.page.padding = 20
         self.page.scroll = ft.ScrollMode.AUTO
-        
-        # Connexion à MongoDB
-        if not db.connect():
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("Erreur de connexion à la base de données!"),
-                bgcolor=ft.Colors.RED
-            )
-            self.page.snack_bar.open = True
-        
         self.seance_active = None
         
     def Head(self):
@@ -73,7 +64,6 @@ class page2_etudiant:
     def Body(self):
         """Corps principal de la page"""
         controls = [
-            # Logo en haut
             ft.Container(
                 content=ft.Image(
                     src="Logo.png",
@@ -94,8 +84,6 @@ class page2_etudiant:
                 ),
                 margin=ft.margin.only(bottom=30),
             ),
-            
-            # Titre de bienvenue
             ft.Text(
                 "Bienvenue sur Presence Plus",
                 size=24,
@@ -105,9 +93,7 @@ class page2_etudiant:
             ft.Container(height=20),
         ]
         
-        # Vérifier s'il y a une séance active
         if not self.On_est_au_Cours():
-            # Aucune séance en cours
             controls.append(
                 ft.Container(
                     content=ft.Column([
@@ -135,19 +121,23 @@ class page2_etudiant:
                 )
             )
         else:
-            # Séance en cours - vérifier si l'étudiant a déjà marqué présent
             from bson import ObjectId
             seance = db.obtenir_seance(str(self.seance_active["_id"]))
-            matiere = db.obtenir_matiere(seance["matiere_code"])
-            
-            # Obtenir le device_id actuel
+            matiere = db.obtenir_matiere(seance["matiere_code"]) if seance else None
+            if not seance or not matiere:
+                controls.append(ft.Text(
+                    "Erreur: séance ou matière introuvable",
+                    size=16, color=ft.Colors.RED_600
+                ))
+                return ft.Column(controls, alignment=ft.MainAxisAlignment.START,
+                                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                 scroll=ft.ScrollMode.ALWAYS, expand=True)
+
             device_id_actuel = obtenir_id_appareil()
             
-            # Chercher si ce device_id a déjà marqué présent
             deja_present = False
             nom_etudiant_present = None
             
-            # Récupérer toutes les présences de cette séance
             presences = list(db.get_collection("presences").find({
                 "seance_id": str(self.seance_active["_id"])
             }))
@@ -158,7 +148,6 @@ class page2_etudiant:
                     nom_etudiant_present = presence.get("nom")
                     break
             
-            # Informations sur la séance
             controls.append(
                 ft.Container(
                     content=ft.Column([
@@ -177,7 +166,6 @@ class page2_etudiant:
             )
             
             if deja_present:
-                # L'étudiant a déjà marqué présent - afficher un message de confirmation
                 controls.append(
                     ft.Container(
                         content=ft.Column([
@@ -234,7 +222,6 @@ class page2_etudiant:
                     )
                 )
             else:
-                # Bouton pour marquer présence
                 controls.append(
                     ft.Container(
                         content=ft.Row([
@@ -269,14 +256,10 @@ class page2_etudiant:
         """Dialog pour valider un étudiant (associer device_id)"""
         print("🔵 Validation étudiant")
         
-        # Récupérer tous les étudiants
         etudiants = db.obtenir_tous_etudiants(titre="Etudiant")
-        
-        # Créer la liste avec RadioButtons
         radio_group = ft.RadioGroup(content=ft.Column())
         
         for etudiant in etudiants:
-            # Vérifier si déjà validé
             est_valide = etudiant.get("device_id") is not None
             
             radio_group.content.controls.append(
@@ -333,10 +316,8 @@ class page2_etudiant:
                 self.page.update()
                 return
             
-            # Obtenir l'ID de l'appareil
             device_id = obtenir_id_appareil()
             
-            # Vérifier si ce device_id est déjà utilisé par quelqu'un d'autre
             tous_etudiants = db.obtenir_tous_etudiants()
             device_deja_utilise = False
             personne_avec_device = None
@@ -357,7 +338,6 @@ class page2_etudiant:
                 self.page.update()
                 return
             
-            # Valider l'étudiant
             result = db.valider_etudiant(radio_group.value, device_id)
             
             if result:
@@ -439,11 +419,9 @@ class page2_etudiant:
         """Dialog pour marquer la présence"""
         print("🔵 Marquage présence")
         
-        # Récupérer tous les étudiants VALIDÉS
         tous_etudiants = db.obtenir_tous_etudiants(titre="Etudiant")
         etudiants_valides = [e for e in tous_etudiants if e.get("device_id") is not None]
         
-        # Créer la liste avec RadioButtons
         radio_group = ft.RadioGroup(content=ft.Column())
         
         for etudiant in etudiants_valides:
@@ -491,7 +469,6 @@ class page2_etudiant:
                 self.page.update()
                 return
             
-            # Vérifier si l'étudiant a déjà marqué présent pour cette séance
             presence_existante = db.obtenir_presence_etudiant(
                 str(self.seance_active["_id"]),
                 radio_group.value
@@ -508,13 +485,9 @@ class page2_etudiant:
                 self.page.update()
                 return
             
-            # Obtenir l'ID de l'appareil actuel
             device_id_actuel = obtenir_id_appareil()
-            
-            # Obtenir la position GPS
             lat, lon = obtenir_position_automatique(self.page, methode="ip")
             
-            # Vérifier la présence (device_id + localisation)
             from bson import ObjectId
             validee, message = db.verifier_presence_validee(
                 seance_id=str(self.seance_active["_id"]),
@@ -526,7 +499,6 @@ class page2_etudiant:
             )
             
             if validee:
-                # Enregistrer la présence
                 etudiant = db.obtenir_etudiant(radio_group.value)
                 db.enregistrer_presence(
                     seance_id=str(self.seance_active["_id"]),
@@ -538,7 +510,6 @@ class page2_etudiant:
                     statut="present"
                 )
                 
-                # Marquer comme validée
                 presence = db.obtenir_presence_etudiant(
                     str(self.seance_active["_id"]),
                     radio_group.value
@@ -547,19 +518,26 @@ class page2_etudiant:
                     db.valider_presence(str(presence["_id"]), True)
                 
                 self.page.snack_bar = ft.SnackBar(
-                    content=ft.Text("✅ Présence Saved!"),
+                    content=ft.Text("✅ Présence enregistrée avec succès!"),
                     bgcolor=ft.Colors.GREEN
                 )
                 dialog.open = False
+                self.page.snack_bar.open = True
+                self.page.update()
+                # Rafraîchir la page pour afficher la confirmation
+                self.page.clean()
+                self.page.appbar = self.Head()
+                self.page.add(self.Body())
+                self.page.update()
+                return
             else:
                 self.page.snack_bar = ft.SnackBar(
                     content=ft.Text(f"❌ {message}\n\nIl y a un problème, veuillez contacter le Délégué"),
                     bgcolor=ft.Colors.RED,
                     duration=5000
                 )
-            
-            self.page.snack_bar.open = True
-            self.page.update()
+                self.page.snack_bar.open = True
+                self.page.update()
         
         dialog = ft.AlertDialog(
             modal=True,
@@ -632,12 +610,10 @@ class page2_etudiant:
         
         def valider_mode(e):
             if mode_choisi.current.value == "delegue":
-                # Mode délégué - demander authentification
                 dialog.open = False
                 self.page.update()
                 self.authentifier_delegue()
             else:
-                # Mode étudiant - pas d'authentification
                 dialog.open = False
                 self.page.update()
         
@@ -745,7 +721,6 @@ class page2_etudiant:
         """Authentification pour les délégués"""
         print("🔵 Authentification délégué")
         
-        # Récupérer tous les délégués
         delegues = db.obtenir_tous_etudiants(titre="Delegue")
         
         if not delegues:
@@ -757,7 +732,6 @@ class page2_etudiant:
             self.page.update()
             return
         
-        # Créer la liste avec RadioButtons
         radio_group = ft.RadioGroup(content=ft.Column())
         
         for delegue in delegues:
@@ -805,15 +779,10 @@ class page2_etudiant:
                 self.page.update()
                 return
             
-            # Obtenir l'appareil actuel
             device_id_actuel = obtenir_id_appareil()
-            
-            # Vérifier le délégué
             delegue = db.obtenir_etudiant(radio_group.value)
             
-            # Vérifier si le délégué a déjà un device_id enregistré
             if delegue.get("device_id") is None:
-                # Première connexion - enregistrer l'appareil
                 db.valider_etudiant(radio_group.value, device_id_actuel)
                 self.page.snack_bar = ft.SnackBar(
                     content=ft.Text(f"✅ Bienvenue {delegue['nom']} (Délégué)\n\n🔐 Cet appareil est maintenant enregistré comme votre appareil autorisé."),
@@ -824,7 +793,6 @@ class page2_etudiant:
                 dialog.open = False
                 self.page.update()
             elif delegue.get("device_id") == device_id_actuel:
-                # Appareil correct - autoriser l'accès
                 self.page.snack_bar = ft.SnackBar(
                     content=ft.Text(f"✅ Bienvenue {delegue['nom']} (Délégué)"),
                     bgcolor=ft.Colors.GREEN
@@ -833,7 +801,6 @@ class page2_etudiant:
                 dialog.open = False
                 self.page.update()
             else:
-                # Mauvais appareil - refuser l'accès
                 self.page.snack_bar = ft.SnackBar(
                     content=ft.Text(f"❌ Accès refusé!\n\nVous ne pouvez vous connecter qu'avec l'appareil enregistré.\n\nCe délégué est lié à un autre appareil."),
                     bgcolor=ft.Colors.RED,
@@ -893,7 +860,6 @@ class page2_etudiant:
         self.page.update()
     
     def build(self, skip_identification=False):
-        # Afficher le workflow d'identification au démarrage (sauf si skip_identification=True)
         if not skip_identification:
             self.choisir_mode_identification()
         

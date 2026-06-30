@@ -27,8 +27,13 @@ class MongoDB:
         
     def connect(self):
         """Établit la connexion à MongoDB Atlas"""
+        if self.client is not None:
+            return True
+        if not self.uri:
+            print("✗ MONGODB_URI manquant dans le fichier .env")
+            return False
         try:
-            self.client = MongoClient(self.uri)
+            self.client = MongoClient(self.uri, serverSelectionTimeoutMS=5000)
             self.db = self.client[self.db_name]
             # Test de connexion
             self.client.admin.command('ping')
@@ -37,6 +42,7 @@ class MongoDB:
             return True
         except Exception as e:
             print(f"✗ Erreur de connexion à MongoDB: {e}")
+            self.client = None
             return False
     
     def create_collections(self):
@@ -49,7 +55,6 @@ class MongoDB:
                 self.db.create_collection(coll)
                 print(f"✓ Collection '{coll}' créée")
                 
-                # Créer des index pour optimiser les recherches
                 if coll == "etudiants":
                     self.db[coll].create_index("matricule", unique=True)
                     self.db[coll].create_index("email", unique=True)
@@ -164,11 +169,11 @@ class MongoDB:
             "localisation": localisation,
             "duree": duree,
             "delegue_matricule": delegue_matricule,
-            "latitude": None,  # Coordonnées GPS du délégué
+            "latitude": None,
             "longitude": None,
-            "presences": [],  # Liste des matricules présents
-            "absences": [],   # Liste des matricules absents
-            "statut": "en_cours",  # en_cours, terminee
+            "presences": [],
+            "absences": [],
+            "statut": "en_cours",
             "date_creation": datetime.now()
         }
         try:
@@ -192,15 +197,12 @@ class MongoDB:
         seances_actives = []
         
         for seance in seances:
-            # Calculer si la séance est encore dans son temps
             temps_ecoule = datetime.now() - seance["date_creation"]
             duree_totale = timedelta(minutes=seance["duree"])
             
-            # Si la durée n'est pas dépassée, la séance est active
             if temps_ecoule < duree_totale:
                 seances_actives.append(seance)
             else:
-                # Marquer la séance comme terminée
                 from bson import ObjectId
                 self.db.seances.update_one(
                     {"_id": seance["_id"]},
@@ -311,16 +313,13 @@ class MongoDB:
         """
         from utils import calculer_distance
         
-        # Vérifier l'étudiant
         etudiant = self.obtenir_etudiant(matricule)
         if not etudiant:
             return False, "Étudiant non trouvé"
         
-        # EXCEPTION: Les délégués peuvent utiliser n'importe quel appareil
         if etudiant.get("titre") == "Delegue":
             return True, "Présence validée (Délégué)"
         
-        # Pour les étudiants normaux, vérifier le device_id
         device_id_enregistre = etudiant.get("device_id")
         if not device_id_enregistre:
             return False, "Vous devez d'abord vous VALIDER (associer cet appareil)"
@@ -328,13 +327,11 @@ class MongoDB:
         if device_id_enregistre != device_id:
             return False, "ID de l'appareil non reconnu. Veuillez vous valider d'abord."
         
-        # Récupérer la séance
         from bson import ObjectId
         seance = self.obtenir_seance(str(seance_id))
         if not seance:
             return False, "Séance non trouvée"
         
-        # Vérifier la localisation
         lat_delegue = seance.get("latitude")
         lon_delegue = seance.get("longitude")
         
