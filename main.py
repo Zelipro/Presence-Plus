@@ -15,17 +15,45 @@ class MainPage:
         self.page.scroll = ft.ScrollMode.AUTO
         
         # Connexion à MongoDB
-        if not db.connect():
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("Erreur de connexion à la base de données!"),
-                bgcolor=ft.Colors.RED
-            )
-            self.page.snack_bar.open = True
-        
+        self.db_ok = db.connect()
+
         self.seance_active = None
         self.mode_utilisateur = None  # "delegue" ou "etudiant"
         self.utilisateur_actuel = None  # Info sur l'utilisateur connecté
-        
+
+        if not self.db_ok:
+            self.afficher_erreur_connexion()
+
+    def afficher_erreur_connexion(self):
+        """Bloque l'accès à l'application tant que la base de données n'est pas joignable"""
+        self.page.clean()
+        self.page.add(
+            ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Icon(ft.Icons.CLOUD_OFF, color=ft.Colors.RED_400, size=60),
+                        ft.Text(
+                            "Connexion à la base de données impossible",
+                            size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_700,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                        ft.Text(
+                            "Vérifiez que le fichier .env existe avec un MONGODB_URI valide, "
+                            "puis relancez l'application.",
+                            size=14, color=ft.Colors.GREY_700,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=15,
+                ),
+                alignment=ft.alignment.center,
+                padding=40,
+                expand=True,
+            )
+        )
+        self.page.update()
+
     def choisir_mode_identification(self):
         """Workflow pour choisir si on est délégué ou étudiant"""
         print("🔵 Choix du mode d'identification")
@@ -330,6 +358,8 @@ class MainPage:
             self.page.update()
     
     def build(self):
+        if not self.db_ok:
+            return
         self.choisir_mode_identification()
 
 
