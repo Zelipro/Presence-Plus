@@ -7,12 +7,24 @@ from math import radians, sin, cos, sqrt, atan2
 import flet as ft
 
 
-def obtenir_id_appareil():
+def obtenir_id_appareil(page: ft.Page = None):
     """
-    Génère un ID unique pour l'appareil
-    Utilise la MAC address pour créer un UUID stable
+    Génère un ID unique pour l'appareil.
+
+    En mode web, la MAC address serait celle du serveur (identique pour
+    tous les utilisateurs), donc on stocke un UUID par navigateur dans
+    le client_storage. En mode desktop, on garde l'UUID basé sur la MAC.
     """
-    # ID basé sur MAC address
+    if page is not None and getattr(page, "web", False):
+        try:
+            device_id = page.client_storage.get("presence_plus.device_id")
+            if not device_id:
+                device_id = str(uuid.uuid4())
+                page.client_storage.set("presence_plus.device_id", device_id)
+            return device_id
+        except Exception as e:
+            print(f"⚠️ client_storage indisponible, repli sur MAC: {e}")
+
     mac = uuid.getnode()
     device_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(mac)))
     return device_id

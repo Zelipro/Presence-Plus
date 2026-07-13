@@ -139,7 +139,7 @@ class page2_etudiant:
                                  scroll=ft.ScrollMode.ALWAYS, expand=True)
 
             # Obtenir le device_id actuel
-            device_id_actuel = obtenir_id_appareil()
+            device_id_actuel = obtenir_id_appareil(self.page)
             
             # Chercher si ce device_id a déjà marqué présent
             deja_present = False
@@ -332,7 +332,7 @@ class page2_etudiant:
                 return
             
             # Obtenir l'ID de l'appareil
-            device_id = obtenir_id_appareil()
+            device_id = obtenir_id_appareil(self.page)
             
             # Vérifier si ce device_id est déjà utilisé par quelqu'un d'autre
             tous_etudiants = db.obtenir_tous_etudiants()
@@ -507,7 +507,7 @@ class page2_etudiant:
                 return
             
             # Obtenir l'ID de l'appareil actuel
-            device_id_actuel = obtenir_id_appareil()
+            device_id_actuel = obtenir_id_appareil(self.page)
             
             # Obtenir la position GPS
             lat, lon = obtenir_position_automatique(self.page, methode="ip")
@@ -811,7 +811,7 @@ class page2_etudiant:
                 return
             
             # Obtenir l'appareil actuel
-            device_id_actuel = obtenir_id_appareil()
+            device_id_actuel = obtenir_id_appareil(self.page)
             
             # Vérifier le délégué
             delegue = db.obtenir_etudiant(radio_group.value)

@@ -220,7 +220,7 @@ class MainPage:
                 self.page.update()
                 return
             
-            device_id_actuel = obtenir_id_appareil()
+            device_id_actuel = obtenir_id_appareil(self.page)
             delegue = db.obtenir_etudiant(radio_group.value)
             
             if delegue.get("device_id") is None:
@@ -341,4 +341,10 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    import os
+    # Mode web: lancer avec WEB=1 python main.py (ou flet run --web main.py)
+    if os.getenv("WEB", "").lower() in ("1", "true", "yes"):
+        port = int(os.getenv("PORT", "8550"))
+        ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port)
+    else:
+        ft.app(target=main)
