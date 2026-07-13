@@ -151,8 +151,8 @@ class page1:
         # Lancer automatiquement la transition vers Main.py
         try:
             print("🚀 Lancement automatique de Main.py...")
-            self.page.controls.clear()
-            from Main import MainPage
+            self.page.clean()
+            from main import MainPage
             mp = MainPage(self.page)
             mp.build()
         except Exception as ex:
