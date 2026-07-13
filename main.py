@@ -15,17 +15,45 @@ class MainPage:
         self.page.scroll = ft.ScrollMode.AUTO
         
         # Connexion à MongoDB
-        if not db.connect():
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("Erreur de connexion à la base de données!"),
-                bgcolor=ft.Colors.RED
-            )
-            self.page.snack_bar.open = True
-        
+        self.db_ok = db.connect()
+
         self.seance_active = None
         self.mode_utilisateur = None  # "delegue" ou "etudiant"
         self.utilisateur_actuel = None  # Info sur l'utilisateur connecté
-        
+
+        if not self.db_ok:
+            self.afficher_erreur_connexion()
+
+    def afficher_erreur_connexion(self):
+        """Bloque l'accès à l'application tant que la base de données n'est pas joignable"""
+        self.page.clean()
+        self.page.add(
+            ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Icon(ft.Icons.CLOUD_OFF, color=ft.Colors.RED_400, size=60),
+                        ft.Text(
+                            "Connexion à la base de données impossible",
+                            size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_700,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                        ft.Text(
+                            "Vérifiez que le fichier .env existe avec un MONGODB_URI valide, "
+                            "puis relancez l'application.",
+                            size=14, color=ft.Colors.GREY_700,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=15,
+                ),
+                alignment=ft.alignment.center,
+                padding=40,
+                expand=True,
+            )
+        )
+        self.page.update()
+
     def choisir_mode_identification(self):
         """Workflow pour choisir si on est délégué ou étudiant"""
         print("🔵 Choix du mode d'identification")
@@ -47,12 +75,10 @@ class MainPage:
                 return
             
             if mode_choisi.current.value == "delegue":
-                # Mode délégué - demander authentification
                 dialog.open = False
                 self.page.update()
                 self.authentifier_delegue()
             else:
-                # Mode étudiant - validation simple
                 self.mode_utilisateur = "etudiant"
                 dialog.open = False
                 self.page.update()
@@ -162,7 +188,6 @@ class MainPage:
         """Authentification pour les délégués"""
         print("🔵 Authentification délégué")
         
-        # Récupérer tous les délégués
         delegues = db.obtenir_tous_etudiants(titre="Delegue")
         
         if not delegues:
@@ -172,11 +197,9 @@ class MainPage:
             )
             self.page.snack_bar.open = True
             self.page.update()
-            # Retourner au choix de mode
             self.choisir_mode_identification()
             return
         
-        # Créer la liste avec RadioButtons
         radio_group = ft.RadioGroup(content=ft.Column())
         
         for delegue in delegues:
@@ -213,7 +236,6 @@ class MainPage:
         def fermer_dialog(e):
             dialog.open = False
             self.page.update()
-            # Retourner au choix de mode
             self.choisir_mode_identification()
         
         def valider_auth(e):
@@ -226,15 +248,10 @@ class MainPage:
                 self.page.update()
                 return
             
-            # Obtenir l'appareil actuel
-            device_id_actuel = obtenir_id_appareil()
-            
-            # Vérifier le délégué
+            device_id_actuel = obtenir_id_appareil(self.page)
             delegue = db.obtenir_etudiant(radio_group.value)
             
-            # Vérifier si le délégué a déjà un device_id enregistré
             if delegue.get("device_id") is None:
-                # Première connexion - enregistrer l'appareil
                 db.valider_etudiant(radio_group.value, device_id_actuel)
                 self.mode_utilisateur = "delegue"
                 self.utilisateur_actuel = delegue
@@ -248,7 +265,6 @@ class MainPage:
                 self.page.update()
                 self.afficher_interface()
             elif delegue.get("device_id") == device_id_actuel:
-                # Appareil correct - autoriser l'accès
                 self.mode_utilisateur = "delegue"
                 self.utilisateur_actuel = delegue
                 self.page.snack_bar = ft.SnackBar(
@@ -260,7 +276,6 @@ class MainPage:
                 self.page.update()
                 self.afficher_interface()
             else:
-                # Mauvais appareil - refuser l'accès
                 self.page.snack_bar = ft.SnackBar(
                     content=ft.Text(f"❌ Accès refusé!\n\nVous ne pouvez vous connecter qu'avec l'appareil enregistré.\n\nCe délégué est lié à un autre appareil."),
                     bgcolor=ft.Colors.RED,
@@ -321,20 +336,21 @@ class MainPage:
     
     def afficher_interface(self):
         """Affiche l'interface selon le mode utilisateur"""
-        # Importer les pages
         from Page2 import page2
         from Page2_Etudiant import page2_etudiant
-        
-        # Nettoyer la page
+
+        # Stocker l'utilisateur courant pour que les sous-pages y accèdent
+        self.page.data = {
+            "utilisateur": self.utilisateur_actuel,
+            "mode": self.mode_utilisateur,
+        }
+
         self.page.clean()
-        self.page.controls.clear()
-        
+
         if self.mode_utilisateur == "delegue":
-            # Afficher l'interface délégué (Page2)
             p2 = page2(self.page)
             p2.build()
         else:
-            # Afficher l'interface étudiant (Page2_Etudiant) sans le workflow d'identification
             p2_etudiant = page2_etudiant(self.page)
             self.page.appbar = p2_etudiant.Head()
             body = p2_etudiant.Body()
@@ -342,16 +358,30 @@ class MainPage:
             self.page.update()
     
     def build(self):
-        # Afficher le workflow de choix au démarrage
+        if not self.db_ok:
+            return
         self.choisir_mode_identification()
 
 
 def main(page: ft.Page):
-    # Afficher d'abord Page1 (accueil avec animation)
-    from Page1 import page1
-    p1 = page1(page)
-    p1.build()
+    from config_screen import ConfigScreen, config_deja_enregistree
+
+    def lancer_page1():
+        from Page1 import page1
+        p1 = page1(page)
+        p1.build()
+
+    if config_deja_enregistree(page):
+        lancer_page1()
+    else:
+        ConfigScreen(page, on_succes=lancer_page1).build()
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    import os
+    # Mode web: lancer avec WEB=1 python main.py (ou flet run --web main.py)
+    if os.getenv("WEB", "").lower() in ("1", "true", "yes"):
+        port = int(os.getenv("PORT", "8550"))
+        ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port)
+    else:
+        ft.app(target=main)

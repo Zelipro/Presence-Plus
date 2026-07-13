@@ -12,15 +12,6 @@ class page2_etudiant:
         self.page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
         self.page.padding = 20
         self.page.scroll = ft.ScrollMode.AUTO
-        
-        # Connexion à MongoDB
-        if not db.connect():
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("Erreur de connexion à la base de données!"),
-                bgcolor=ft.Colors.RED
-            )
-            self.page.snack_bar.open = True
-        
         self.seance_active = None
         
     def Head(self):
@@ -136,21 +127,26 @@ class page2_etudiant:
             )
         else:
             # Séance en cours - vérifier si l'étudiant a déjà marqué présent
-            from bson import ObjectId
-            seance = db.obtenir_seance(str(self.seance_active["_id"]))
+            seance = self.seance_active
             matiere = db.obtenir_matiere(seance["matiere_code"])
-            
+            if not matiere:
+                controls.append(ft.Text(
+                    "Erreur: séance ou matière introuvable",
+                    size=16, color=ft.Colors.RED_600
+                ))
+                return ft.Column(controls, alignment=ft.MainAxisAlignment.START,
+                                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                 scroll=ft.ScrollMode.ALWAYS, expand=True)
+
             # Obtenir le device_id actuel
-            device_id_actuel = obtenir_id_appareil()
+            device_id_actuel = obtenir_id_appareil(self.page)
             
             # Chercher si ce device_id a déjà marqué présent
             deja_present = False
             nom_etudiant_present = None
             
             # Récupérer toutes les présences de cette séance
-            presences = list(db.get_collection("presences").find({
-                "seance_id": str(self.seance_active["_id"])
-            }))
+            presences = db.obtenir_presences_seance(str(self.seance_active["_id"]))
             
             for presence in presences:
                 if presence.get("device_id") == device_id_actuel:
@@ -334,7 +330,7 @@ class page2_etudiant:
                 return
             
             # Obtenir l'ID de l'appareil
-            device_id = obtenir_id_appareil()
+            device_id = obtenir_id_appareil(self.page)
             
             # Vérifier si ce device_id est déjà utilisé par quelqu'un d'autre
             tous_etudiants = db.obtenir_tous_etudiants()
@@ -509,13 +505,12 @@ class page2_etudiant:
                 return
             
             # Obtenir l'ID de l'appareil actuel
-            device_id_actuel = obtenir_id_appareil()
+            device_id_actuel = obtenir_id_appareil(self.page)
             
             # Obtenir la position GPS
             lat, lon = obtenir_position_automatique(self.page, methode="ip")
             
             # Vérifier la présence (device_id + localisation)
-            from bson import ObjectId
             validee, message = db.verifier_presence_validee(
                 seance_id=str(self.seance_active["_id"]),
                 matricule=radio_group.value,
@@ -547,19 +542,26 @@ class page2_etudiant:
                     db.valider_presence(str(presence["_id"]), True)
                 
                 self.page.snack_bar = ft.SnackBar(
-                    content=ft.Text("✅ Présence Saved!"),
+                    content=ft.Text("✅ Présence enregistrée avec succès!"),
                     bgcolor=ft.Colors.GREEN
                 )
                 dialog.open = False
+                self.page.snack_bar.open = True
+                self.page.update()
+                # Rafraîchir la page pour afficher la confirmation
+                self.page.clean()
+                self.page.appbar = self.Head()
+                self.page.add(self.Body())
+                self.page.update()
+                return
             else:
                 self.page.snack_bar = ft.SnackBar(
                     content=ft.Text(f"❌ {message}\n\nIl y a un problème, veuillez contacter le Délégué"),
                     bgcolor=ft.Colors.RED,
                     duration=5000
                 )
-            
-            self.page.snack_bar.open = True
-            self.page.update()
+                self.page.snack_bar.open = True
+                self.page.update()
         
         dialog = ft.AlertDialog(
             modal=True,
@@ -806,7 +808,7 @@ class page2_etudiant:
                 return
             
             # Obtenir l'appareil actuel
-            device_id_actuel = obtenir_id_appareil()
+            device_id_actuel = obtenir_id_appareil(self.page)
             
             # Vérifier le délégué
             delegue = db.obtenir_etudiant(radio_group.value)

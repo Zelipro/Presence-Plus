@@ -7,12 +7,24 @@ from math import radians, sin, cos, sqrt, atan2
 import flet as ft
 
 
-def obtenir_id_appareil():
+def obtenir_id_appareil(page: ft.Page = None):
     """
-    Génère un ID unique pour l'appareil
-    Utilise la MAC address pour créer un UUID stable
+    Génère un ID unique pour l'appareil.
+
+    En mode web, la MAC address serait celle du serveur (identique pour
+    tous les utilisateurs), donc on stocke un UUID par navigateur dans
+    le client_storage. En mode desktop, on garde l'UUID basé sur la MAC.
     """
-    # ID basé sur MAC address
+    if page is not None and getattr(page, "web", False):
+        try:
+            device_id = page.client_storage.get("presence_plus.device_id")
+            if not device_id:
+                device_id = str(uuid.uuid4())
+                page.client_storage.set("presence_plus.device_id", device_id)
+            return device_id
+        except Exception as e:
+            print(f"⚠️ client_storage indisponible, repli sur MAC: {e}")
+
     mac = uuid.getnode()
     device_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(mac)))
     return device_id
@@ -320,38 +332,31 @@ def generer_pdf_presences(matiere_code, mois, annee):
         nb_jours = monthrange(int(annee), int(mois))[1]
         dernier_jour = datetime(int(annee), int(mois), nb_jours, 23, 59, 59)
         
-        seances = list(db.get_collection("seances").find({
-            "matiere_code": matiere_code,
-            "date_creation": {
-                "$gte": premier_jour,
-                "$lte": dernier_jour
-            }
-        }).sort("date_creation", 1))
-        
+        seances = db.obtenir_seances_matiere_periode(matiere_code, premier_jour, dernier_jour)
+
         if not seances:
             return False, f"Impossible d'exporter: Aucune séance trouvée pour {matiere['titre']} en {mois_noms[mois]} {annee}"
         else:
             # Créer le tableau
             # En-tête: Nom | Date1 | Date2 | Date3 | ... | Total
-            dates_seances = [s["date_creation"].strftime("%d/%m") for s in seances]
+            dates_seances = [
+                datetime.fromisoformat(s["date_creation"].replace("Z", "+00:00")).strftime("%d/%m")
+                for s in seances
+            ]
             header = ["N°", "Nom de l'étudiant", "Matricule"] + dates_seances + ["Total"]
-            
+
             # Données du tableau
             data = [header]
-            
+
             for idx, etudiant in enumerate(etudiants_valides, 1):
                 row = [str(idx), etudiant["nom"], etudiant["matricule"]]
-                
+
                 nb_presences = 0
                 for seance in seances:
                     # Vérifier si l'étudiant était présent
-                    presence = db.get_collection("presences").find_one({
-                        "seance_id": str(seance["_id"]),
-                        "matricule": etudiant["matricule"],
-                        "validee": True
-                    })
-                    
-                    if presence:
+                    presence = db.obtenir_presence_etudiant(str(seance["_id"]), etudiant["matricule"])
+
+                    if presence and presence.get("validee"):
                         row.append("✓")
                         nb_presences += 1
                     else:

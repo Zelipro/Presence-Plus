@@ -12,15 +12,6 @@ class page2:
         self.page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
         self.page.padding = 20
         self.page.scroll = ft.ScrollMode.AUTO
-        
-        # Connexion à MongoDB
-        if not db.connect():
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("Erreur de connexion à la base de données!"),
-                bgcolor=ft.Colors.RED
-            )
-            self.page.snack_bar.open = True
-        
         self.seance_active = None
         
     def Head(self):
@@ -115,11 +106,13 @@ class page2:
             animate=ft.Animation(300, ft.AnimationCurve.EASE_IN_OUT),
         )
         
-        if self.On_est_au_Cours():
+        seance_en_cours = self.On_est_au_Cours()
+
+        if seance_en_cours:
             create_session_btn.bgcolor = ft.Colors.GREY_400
             create_session_btn.on_click = None
             create_session_btn.ink = False
-        
+
         # Construire la liste des contrôles
         controls = [
             # Logo en haut
@@ -158,7 +151,7 @@ class page2:
         ]
         
         # Afficher les informations de la séance en cours
-        if not self.On_est_au_Cours():
+        if not seance_en_cours:
             controls.append(ft.Text(
                 "Aucune séance en cours",
                 size=16,
@@ -167,8 +160,7 @@ class page2:
             ))
         else:
             # Séance active - afficher les informations
-            from bson import ObjectId
-            seance = db.obtenir_seance(str(self.seance_active["_id"]))
+            seance = self.seance_active
             matiere = db.obtenir_matiere(seance["matiere_code"])
             
             # Calculer le temps restant
@@ -440,25 +432,25 @@ class page2:
                                 delegue["nom"], 
                                 weight=ft.FontWeight.BOLD, 
                                 size=18,
-                                color=ft.Colors.BLUE_900  # Couleur foncée pour meilleure visibilité
+                                color=ft.Colors.BLUE_900
                             ),
                             ft.Text(
                                 f"Matricule: {delegue['matricule']} • Niveau: {delegue['level']}", 
                                 size=14, 
-                                color=ft.Colors.BLACK87  # Plus foncé
+                                color=ft.Colors.BLACK87
                             ),
                             ft.Text(
                                 delegue["email"], 
                                 size=13, 
                                 italic=True, 
-                                color=ft.Colors.BLACK54  # Plus lisible
+                                color=ft.Colors.BLACK54
                             ),
                         ], spacing=4, expand=True),
                     ]),
                     padding=15,
                     border=ft.border.all(2, ft.Colors.BLUE_300),
                     border_radius=12,
-                    bgcolor=ft.Colors.WHITE,  # Fond blanc pour meilleur contraste
+                    bgcolor=ft.Colors.WHITE,
                     margin=ft.margin.only(bottom=10),
                 )
             )
@@ -572,9 +564,16 @@ class page2:
             value="120"
         )
         
+        # Récupérer le matricule du délégué connecté depuis page.data
+        delegue_matricule_auto = ""
+        if self.page.data and self.page.data.get("utilisateur"):
+            delegue_matricule_auto = self.page.data["utilisateur"].get("matricule", "")
+
         delegue_field = ft.TextField(
             label="👤 Matricule du délégué",
             hint_text="Ex: DEL001",
+            value=delegue_matricule_auto,
+            read_only=bool(delegue_matricule_auto),
             filled=True,
             border_color=ft.Colors.BLUE_200,
         )
