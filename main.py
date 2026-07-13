@@ -364,10 +364,17 @@ class MainPage:
 
 
 def main(page: ft.Page):
-    # Afficher d'abord Page1 (accueil avec animation)
-    from Page1 import page1
-    p1 = page1(page)
-    p1.build()
+    from config_screen import ConfigScreen, config_deja_enregistree
+
+    def lancer_page1():
+        from Page1 import page1
+        p1 = page1(page)
+        p1.build()
+
+    if config_deja_enregistree(page):
+        lancer_page1()
+    else:
+        ConfigScreen(page, on_succes=lancer_page1).build()
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 # Version épinglée: l'application utilise l'API Flet 0.28.x
 # (les versions 0.70+/1.x ont renommé ImageFit, Colors, etc.)
 flet==0.28.3
-pymongo[srv]>=4.6.0
+supabase>=2.9.0
 python-dotenv>=1.0.0
 geocoder>=1.38.1
 geopy>=2.4.0

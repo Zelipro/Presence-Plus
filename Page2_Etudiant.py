@@ -146,9 +146,7 @@ class page2_etudiant:
             nom_etudiant_present = None
             
             # Récupérer toutes les présences de cette séance
-            presences = list(db.get_collection("presences").find({
-                "seance_id": str(self.seance_active["_id"])
-            }))
+            presences = db.obtenir_presences_seance(str(self.seance_active["_id"]))
             
             for presence in presences:
                 if presence.get("device_id") == device_id_actuel:
@@ -513,7 +511,6 @@ class page2_etudiant:
             lat, lon = obtenir_position_automatique(self.page, methode="ip")
             
             # Vérifier la présence (device_id + localisation)
-            from bson import ObjectId
             validee, message = db.verifier_presence_validee(
                 seance_id=str(self.seance_active["_id"]),
                 matricule=radio_group.value,
